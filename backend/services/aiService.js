@@ -69,7 +69,7 @@ async function callGroqCompletion(groq, model, systemPrompt, userPrompt) {
     ],
     response_format: { type: 'json_object' },
     temperature: 0.2,
-    max_tokens: 512,
+    max_tokens: 1024,
   });
 }
 
