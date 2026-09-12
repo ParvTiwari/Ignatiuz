@@ -14,15 +14,39 @@ const CATEGORY_THEMES = {
   General: { bg: '#f8fafc', color: '#334155', border: '#cbd5e1' },
 };
 
+const SENTIMENT_THEMES = {
+  Frustrated: { icon: '😡', label: 'Frustrated', bg: '#fef2f2', color: '#991b1b', border: '#fecaca' },
+  Neutral: { icon: '😐', label: 'Neutral', bg: '#f8fafc', color: '#334155', border: '#e2e8f0' },
+  Positive: { icon: '😊', label: 'Positive', bg: '#ecfdf5', color: '#065f46', border: '#a7f3d0' },
+};
+
+const CHURN_THEMES = {
+  High: { label: 'High Risk', bg: '#fef2f2', color: '#991b1b', border: '#fecaca', icon: '🚨' },
+  Medium: { label: 'Moderate', bg: '#fffbeb', color: '#92400e', border: '#fde68a', icon: '⚠️' },
+  Low: { label: 'Low Risk', bg: '#ecfdf5', color: '#065f46', border: '#a7f3d0', icon: '🟢' },
+};
+
 export default function TicketResult({ result, onReset }) {
   const [copied, setCopied] = useState(false);
 
   if (!result) return null;
 
-  const { category, priority, priorityReason, suggestedResponse } = result;
+  const {
+    category,
+    priority,
+    priorityReason,
+    sentiment,
+    churnRisk,
+    slaTarget,
+    recommendedRoute,
+    extractedEntities = [],
+    suggestedResponse,
+  } = result;
 
   const priorityStyle = PRIORITY_THEMES[priority] || PRIORITY_THEMES.Medium;
   const categoryStyle = CATEGORY_THEMES[category] || CATEGORY_THEMES.General;
+  const sentimentStyle = SENTIMENT_THEMES[sentiment] || SENTIMENT_THEMES.Neutral;
+  const churnStyle = CHURN_THEMES[churnRisk] || CHURN_THEMES.Low;
 
   const handleCopy = async () => {
     try {
@@ -36,8 +60,12 @@ export default function TicketResult({ result, onReset }) {
 
   return (
     <div className="result-card">
+      {/* Card Header */}
       <div className="result-header">
-        <h3 className="result-title">🎯 AI Triage Result</h3>
+        <div className="result-title-group">
+          <span className="live-indicator">● LIVE AI TRIAGE</span>
+          <h3 className="result-title">Intelligence Triage Card</h3>
+        </div>
         {onReset && (
           <button type="button" className="reset-btn" onClick={onReset}>
             ↺ Analyze Another Ticket
@@ -45,9 +73,10 @@ export default function TicketResult({ result, onReset }) {
         )}
       </div>
 
-      <div className="badges-row">
-        <div className="badge-item">
-          <span className="badge-label">Category:</span>
+      {/* Intelligence Metrics Grid */}
+      <div className="metrics-grid">
+        <div className="metric-box">
+          <span className="metric-label">Category</span>
           <span
             className="badge badge-category"
             style={{
@@ -60,8 +89,8 @@ export default function TicketResult({ result, onReset }) {
           </span>
         </div>
 
-        <div className="badge-item">
-          <span className="badge-label">Priority:</span>
+        <div className="metric-box">
+          <span className="metric-label">Priority Level</span>
           <span
             className="badge badge-priority"
             style={{
@@ -77,19 +106,85 @@ export default function TicketResult({ result, onReset }) {
             {priority}
           </span>
         </div>
+
+        <div className="metric-box">
+          <span className="metric-label">Customer Sentiment</span>
+          <span
+            className="badge"
+            style={{
+              backgroundColor: sentimentStyle.bg,
+              color: sentimentStyle.color,
+              borderColor: sentimentStyle.border,
+            }}
+          >
+            <span className="badge-icon">{sentimentStyle.icon}</span>
+            {sentimentStyle.label}
+          </span>
+        </div>
+
+        <div className="metric-box">
+          <span className="metric-label">Churn Risk</span>
+          <span
+            className="badge"
+            style={{
+              backgroundColor: churnStyle.bg,
+              color: churnStyle.color,
+              borderColor: churnStyle.border,
+            }}
+          >
+            <span className="badge-icon">{churnStyle.icon}</span>
+            {churnStyle.label}
+          </span>
+        </div>
       </div>
 
+      {/* Operations & SLA Banner */}
+      <div className="operations-bar">
+        <div className="op-item">
+          <span className="op-icon">⏱️</span>
+          <div className="op-content">
+            <span className="op-label">Target SLA Deadline</span>
+            <span className="op-value">{slaTarget || '< 4 hours'}</span>
+          </div>
+        </div>
+        <div className="op-divider"></div>
+        <div className="op-item">
+          <span className="op-icon">🏢</span>
+          <div className="op-content">
+            <span className="op-label">Recommended Routing</span>
+            <span className="op-value">{recommendedRoute || 'Tier 1 Support'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Extracted Key Entities & Telemetry */}
+      {extractedEntities.length > 0 && (
+        <div className="entities-section">
+          <span className="section-label">🔍 Extracted Telemetry & Key Entities</span>
+          <div className="entities-container">
+            {extractedEntities.map((entity, idx) => (
+              <div key={idx} className="entity-chip">
+                <span className="entity-key">{entity.label}:</span>
+                <span className="entity-val">{entity.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Priority Rationale Section */}
       <div className="reason-section">
-        <span className="section-label">Priority Reason</span>
+        <span className="section-label">AI Priority Rationale</span>
         <div className="reason-box">
           <span className="reason-icon">💡</span>
           <p className="reason-text">{priorityReason}</p>
         </div>
       </div>
 
+      {/* Suggested Response Section */}
       <div className="response-section">
         <div className="response-header">
-          <span className="section-label">Suggested Response Draft</span>
+          <span className="section-label">AI Drafted Customer Reply</span>
           <button
             type="button"
             className={`copy-btn ${copied ? 'copied' : ''}`}

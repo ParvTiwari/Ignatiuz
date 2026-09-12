@@ -311,6 +311,20 @@ body {
   padding-bottom: 16px;
 }
 
+.result-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.live-indicator {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #10b981;
+  text-transform: uppercase;
+}
+
 .result-title {
   font-size: 1.35rem;
   font-weight: 700;
@@ -334,23 +348,29 @@ body {
   color: var(--text-main);
 }
 
-/* Badges Row */
-.badges-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-  margin-bottom: 24px;
+/* Intelligence Metrics Grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
-.badge-item {
+.metric-box {
+  background: #f8fafc;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.badge-label {
-  font-size: 0.85rem;
-  font-weight: 600;
+.metric-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text-muted);
 }
 
@@ -358,17 +378,107 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 6px 12px;
   border-radius: 9999px;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 600;
   border: 1px solid transparent;
+  width: fit-content;
+}
+
+.badge-icon {
+  font-size: 0.95rem;
 }
 
 .priority-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+}
+
+/* Operations & SLA Bar */
+.operations-bar {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.op-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.op-icon {
+  font-size: 1.4rem;
+}
+
+.op-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.op-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.op-value {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.op-divider {
+  width: 1px;
+  height: 32px;
+  background-color: #cbd5e1;
+}
+
+/* Extracted Entities Section */
+.entities-section {
+  margin-bottom: 24px;
+}
+
+.entities-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.entity-chip {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.entity-key {
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+}
+
+.entity-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #1e293b;
+  font-weight: 600;
 }
 
 /* Reason Section */
