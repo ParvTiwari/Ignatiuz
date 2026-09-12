@@ -203,7 +203,7 @@ export default function App() {
           <div>
             <h1 className="brand-title">Customer Support Operations Center</h1>
             <p className="brand-subtitle">
-              Enterprise AI Triage & Gmail Response Gateway • Powered by Groq LPUs
+              Enterprise AI Triage & Gmail Response Gateway
             </p>
           </div>
         </div>
