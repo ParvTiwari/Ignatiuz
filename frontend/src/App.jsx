@@ -180,6 +180,12 @@ export default function App() {
     setTickets((prev) => [newTicket, ...prev]);
   };
 
+  // Append imported CSV tickets to queue
+  const handleImportTickets = (importedTickets) => {
+    if (!Array.isArray(importedTickets) || importedTickets.length === 0) return;
+    setTickets((prev) => [...prev, ...importedTickets]);
+  };
+
   // Reset to default seed
   const handleResetDemoData = () => {
     if (window.confirm('Reset queue back to original 5 demo tickets?')) {
@@ -241,6 +247,7 @@ export default function App() {
         onBatchTriage={handleBatchTriage}
         onSendEmail={handleSendEmail}
         onOpenNewTicketModal={() => setIsModalOpen(true)}
+        onImportTickets={handleImportTickets}
         isBatchTriaging={isBatchTriaging}
         triagingProgress={triagingProgress}
       />

@@ -1,0 +1,5 @@
+customerEmail,subject,description
+billing.admin@startup.io,"Unexpected $45 charge on canceled plan","We canceled our starter subscription on September 1st but our bank statement shows a recurring $45 charge today. Please process a full reversal."
+lead.dev@enterprise.org,"Database migration script timeout on v2.4 upgrade","The automated postgres migration times out after 30 seconds on the users_permissions table. Error log shows lock contention with active worker threads."
+jessica.reed@fintech.net,"SSO login loop with Okta SAML integration","When our employees attempt to log in using our Okta corporate SSO, they get redirected in an infinite loop between the auth endpoint and callback URL."
+hr.ops@globalretail.com,"Requesting bulk user offboarding assistance","We need to immediately revoke access for 15 seasonal employee accounts and reassign their open tickets to the central manager queue."

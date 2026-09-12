@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { parseTicketsCsv } from '../utils/csvImport';
 
 const PRIORITY_BADGES = {
   Urgent: { bg: '#fef2f2', color: '#991b1b', border: '#fecaca', dot: '#ef4444' },
@@ -20,9 +21,11 @@ export default function TicketTable({
   onBatchTriage,
   onSendEmail,
   onOpenNewTicketModal,
+  onImportTickets,
   isBatchTriaging = false,
   triagingProgress = '',
 }) {
+  const fileInputRef = useRef(null);
   const [activeServingId, setActiveServingId] = useState(null);
   const [editedResponse, setEditedResponse] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -82,6 +85,37 @@ export default function TicketTable({
       showToast(`Send failed: ${err.message}`, 'error');
     } finally {
       setIsSendingEmail(false);
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const { imported, skippedCount } = await parseTicketsCsv(file);
+
+      if (imported.length === 0) {
+        showToast(
+          `No valid tickets found in CSV.${skippedCount > 0 ? ` Skipped ${skippedCount} empty row(s).` : ''}`,
+          'error'
+        );
+      } else {
+        if (onImportTickets) {
+          onImportTickets(imported);
+        }
+        showToast(
+          `Imported ${imported.length} ticket${imported.length === 1 ? '' : 's'}${
+            skippedCount > 0 ? `, skipped ${skippedCount}` : ''
+          }.`,
+          'success'
+        );
+      }
+    } catch (err) {
+      console.error('CSV import error:', err);
+      showToast(`CSV error: ${err.message || 'Invalid or malformed CSV file'}`, 'error');
+    } finally {
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -172,6 +206,32 @@ export default function TicketTable({
           >
             ➕ Add Ticket
           </button>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept=".csv"
+            onChange={handleFileChange}
+          />
+
+          <button
+            type="button"
+            className="import-csv-btn"
+            onClick={() => fileInputRef.current?.click()}
+            title="Upload CSV to import customer support tickets"
+          >
+            📥 Import CSV
+          </button>
+
+          <a
+            href="/sample-tickets.csv"
+            download="sample-tickets.csv"
+            className="download-sample-link"
+            title="Download 4-ticket example CSV for demo"
+          >
+            ⬇ Download sample CSV
+          </a>
         </div>
       </div>
 
