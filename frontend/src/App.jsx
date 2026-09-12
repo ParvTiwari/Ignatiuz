@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DashboardStats from './components/DashboardStats';
 import TicketTable from './components/TicketTable';
 import NewTicketModal from './components/NewTicketModal';
-import { analyzeTicket, sendEmail } from './api/ticketApi';
+import { analyzeTicket, batchAnalyzeTickets, sendEmail } from './api/ticketApi';
 
 const STORAGE_KEY = 'support_assistant_tickets_v1';
 
@@ -104,7 +104,7 @@ export default function App() {
     }
   };
 
-  // Batch triage all unanalyzed tickets
+  // Batch triage all unanalyzed tickets via batchAnalyzeTickets endpoint
   const handleBatchTriage = async () => {
     const unanalyzed = tickets.filter(
       (t) => t.status !== 'Resolved' && !t.suggestedResponse
@@ -113,32 +113,32 @@ export default function App() {
     if (unanalyzed.length === 0) return;
 
     setIsBatchTriaging(true);
+    setTriagingProgress(`Triaging ${unanalyzed.length} tickets with AI...`);
     setGlobalError('');
 
-    let completed = 0;
-    const updatedTickets = [...tickets];
+    try {
+      const data = await batchAnalyzeTickets(unanalyzed);
+      const results = data?.results || [];
 
-    for (const ticket of unanalyzed) {
-      setTriagingProgress(`Triaging ${completed + 1} of ${unanalyzed.length}...`);
-      try {
-        const analysis = await analyzeTicket(ticket.subject, ticket.description);
-        const index = updatedTickets.findIndex((t) => t.id === ticket.id);
-        if (index !== -1) {
-          updatedTickets[index] = {
-            ...updatedTickets[index],
-            ...analysis,
-          };
-        }
-      } catch (err) {
-        console.error(`Error triaging ${ticket.id}:`, err);
-        setGlobalError(`Some tickets failed to triage: ${err.message}`);
-      }
-      completed++;
-      setTickets([...updatedTickets]);
+      setTickets((prev) =>
+        prev.map((ticket) => {
+          const matched = results.find((r) => r.id === ticket.id && r.success);
+          if (matched && matched.analysis) {
+            return {
+              ...ticket,
+              ...matched.analysis,
+            };
+          }
+          return ticket;
+        })
+      );
+    } catch (err) {
+      console.error('Error during batch triage:', err);
+      setGlobalError(err.message || 'Batch triage failed.');
+    } finally {
+      setIsBatchTriaging(false);
+      setTriagingProgress('');
     }
-
-    setIsBatchTriaging(false);
-    setTriagingProgress('');
   };
 
   // Send simulated Gmail response

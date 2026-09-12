@@ -591,6 +591,39 @@ body {
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mini-chip-churn.churn-high {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.mini-chip-churn.churn-medium {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.mini-chip-churn.churn-low {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.mini-chip-entity {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #1e293b;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.mini-chip-entity strong {
+  color: #4f46e5;
+  font-weight: 700;
 }
 
 .serving-content-grid {

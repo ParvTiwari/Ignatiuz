@@ -291,12 +291,36 @@ export default function TicketTable({
                                 {ticket.sentiment && (
                                   <span className="mini-chip">Sentiment: {ticket.sentiment}</span>
                                 )}
+                                {ticket.churnRisk && (
+                                  <span
+                                    className={`mini-chip mini-chip-churn churn-${ticket.churnRisk.toLowerCase()}`}
+                                    title="Customer Churn Risk"
+                                  >
+                                    {ticket.churnRisk === 'High'
+                                      ? '🚨'
+                                      : ticket.churnRisk === 'Medium'
+                                      ? '⚠️'
+                                      : '🟢'}{' '}
+                                    Churn: {ticket.churnRisk}
+                                  </span>
+                                )}
                                 {ticket.slaTarget && (
                                   <span className="mini-chip">SLA: {ticket.slaTarget}</span>
                                 )}
                                 {ticket.recommendedRoute && (
                                   <span className="mini-chip">Route: {ticket.recommendedRoute}</span>
                                 )}
+                                {Array.isArray(ticket.extractedEntities) &&
+                                  ticket.extractedEntities.length > 0 &&
+                                  ticket.extractedEntities.map((entity, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="mini-chip mini-chip-entity"
+                                      title="Extracted Telemetry"
+                                    >
+                                      <strong>{entity.label}:</strong> {entity.value}
+                                    </span>
+                                  ))}
                               </div>
                             </div>
 
