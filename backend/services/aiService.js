@@ -1,7 +1,8 @@
 const Groq = require('groq-sdk');
 
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
-const FALLBACK_MODEL = 'llama-3.1-8b-instant';
+// Active production models on Groq
+const DEFAULT_MODEL = 'openai/gpt-oss-120b';
+const FALLBACK_MODEL = 'openai/gpt-oss-20b';
 
 /**
  * Strips markdown code fence blocks (```json ... ``` or ``` ... ```) if present.
@@ -52,6 +53,27 @@ function sanitizeAnalysisResult(data) {
 }
 
 /**
+ * Sends chat completion request to Groq API.
+ * @param {Groq} groq
+ * @param {string} model
+ * @param {string} systemPrompt
+ * @param {string} userPrompt
+ * @returns {Promise<any>}
+ */
+async function callGroqCompletion(groq, model, systemPrompt, userPrompt) {
+  return await groq.chat.completions.create({
+    model: model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.2,
+    max_tokens: 512,
+  });
+}
+
+/**
  * Analyzes a customer support ticket using Groq API.
  * @param {string} subject - Subject line of the ticket
  * @param {string} description - Detailed description of the issue
@@ -70,7 +92,7 @@ async function analyzeTicket(subject, description) {
   }
 
   const groq = new Groq({ apiKey: apiKey.trim() });
-  const model = process.env.GROQ_MODEL || DEFAULT_MODEL;
+  let model = process.env.GROQ_MODEL || DEFAULT_MODEL;
 
   const systemPrompt = `You are an expert AI customer support triage assistant.
 Analyze the incoming support ticket and output STRICT, VALID JSON ONLY.
@@ -98,16 +120,25 @@ Rules:
 Ticket Description: ${description || 'No description provided'}`;
 
   try {
-    const chatCompletion = await groq.chat.completions.create({
-      model: model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.2,
-      max_tokens: 512,
-    });
+    let chatCompletion;
+
+    try {
+      chatCompletion = await callGroqCompletion(groq, model, systemPrompt, userPrompt);
+    } catch (primaryErr) {
+      // Automatic fallback if model is decommissioned or not found (404)
+      if (
+        (primaryErr.status === 404 || primaryErr.code === 'model_not_found' || primaryErr.code === 'model_decommissioned') &&
+        model !== DEFAULT_MODEL
+      ) {
+        console.warn(
+          `[aiService] Model "${model}" not found or decommissioned. Falling back to "${DEFAULT_MODEL}"...`
+        );
+        model = DEFAULT_MODEL;
+        chatCompletion = await callGroqCompletion(groq, model, systemPrompt, userPrompt);
+      } else {
+        throw primaryErr;
+      }
+    }
 
     const rawContent = chatCompletion.choices?.[0]?.message?.content || '{}';
     const cleanedContent = cleanJsonOutput(rawContent);
@@ -116,7 +147,6 @@ Ticket Description: ${description || 'No description provided'}`;
     try {
       parsedData = JSON.parse(cleanedContent);
     } catch (parseErr) {
-      // Safe fallback: attempt to extract json substring if markdown fences or preamble were included
       const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         parsedData = JSON.parse(jsonMatch[0]);
