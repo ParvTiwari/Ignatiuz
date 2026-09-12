@@ -2,14 +2,29 @@ import React from 'react';
 
 export default function DashboardStats({ tickets = [] }) {
   const total = tickets.length;
-  const resolved = tickets.filter((t) => t.status === 'Resolved').length;
+  const todayStr = new Date().toDateString();
+
+  // 1. Solved Today: filter by status === 'Resolved' AND resolvedAt calendar date matches today
+  const solvedToday = tickets.filter(
+    (t) =>
+      t.status === 'Resolved' &&
+      t.resolvedAt &&
+      new Date(t.resolvedAt).toDateString() === todayStr
+  ).length;
+
+  const allResolved = tickets.filter((t) => t.status === 'Resolved').length;
   const pending = tickets.filter((t) => t.status === 'Pending' || !t.status).length;
   const urgent = tickets.filter((t) => t.priority === 'Urgent').length;
   const high = tickets.filter((t) => t.priority === 'High').length;
   const medium = tickets.filter((t) => t.priority === 'Medium').length;
   const low = tickets.filter((t) => t.priority === 'Low').length;
 
-  const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+  // 2. High Churn Risk: still-open accounts where churnRisk === 'High' and status !== 'Resolved'
+  const highChurnRiskOpen = tickets.filter(
+    (t) => t.churnRisk === 'High' && t.status !== 'Resolved'
+  ).length;
+
+  const resolutionRate = total > 0 ? Math.round((allResolved / total) * 100) : 0;
 
   return (
     <div className="stats-dashboard">
@@ -28,8 +43,10 @@ export default function DashboardStats({ tickets = [] }) {
             <span className="kpi-label">Solved Today</span>
             <span className="kpi-icon">✅</span>
           </div>
-          <div className="kpi-value">{resolved}</div>
-          <div className="kpi-subtext">{resolutionRate}% Resolution Rate</div>
+          <div className="kpi-value">{solvedToday}</div>
+          <div className="kpi-subtext">
+            {allResolved} all-time resolved ({resolutionRate}%)
+          </div>
         </div>
 
         <div className="kpi-card kpi-warning">
@@ -51,6 +68,15 @@ export default function DashboardStats({ tickets = [] }) {
             {urgent} P1 Critical • {high} P2 High
           </div>
         </div>
+
+        <div className="kpi-card kpi-danger">
+          <div className="kpi-header">
+            <span className="kpi-label">High Churn Risk</span>
+            <span className="kpi-icon">⚠️</span>
+          </div>
+          <div className="kpi-value">{highChurnRiskOpen}</div>
+          <div className="kpi-subtext">Accounts needing retention focus</div>
+        </div>
       </div>
 
       {total > 0 && (
@@ -59,7 +85,7 @@ export default function DashboardStats({ tickets = [] }) {
             <div className="summary-header">
               <span className="summary-title">Resolution Progress</span>
               <span className="summary-metric">
-                {resolved} of {total} Solved ({resolutionRate}%)
+                {allResolved} of {total} Solved ({resolutionRate}%)
               </span>
             </div>
             <div className="progress-track">
