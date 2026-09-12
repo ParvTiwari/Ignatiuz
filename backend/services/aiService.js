@@ -18,13 +18,15 @@ function cleanJsonOutput(rawString) {
 }
 
 /**
- * Validates and normalizes the parsed ticket analysis object.
+ * Validates and normalizes the parsed ticket analysis object with enterprise intelligence fields.
  * @param {object} data
- * @returns {{category: string, priority: string, priorityReason: string, suggestedResponse: string}}
+ * @returns {{category: string, priority: string, priorityReason: string, sentiment: string, churnRisk: string, slaTarget: string, recommendedRoute: string, extractedEntities: Array<{label: string, value: string}>, suggestedResponse: string}}
  */
 function sanitizeAnalysisResult(data) {
   const allowedCategories = ['Billing', 'Technical', 'Account', 'General'];
   const allowedPriorities = ['Low', 'Medium', 'High', 'Urgent'];
+  const allowedSentiments = ['Frustrated', 'Neutral', 'Positive'];
+  const allowedChurnRisks = ['Low', 'Medium', 'High'];
 
   const category = allowedCategories.includes(data?.category)
     ? data.category
@@ -39,6 +41,56 @@ function sanitizeAnalysisResult(data) {
       ? data.priorityReason.trim()
       : 'Standard triage assessment based on ticket content.';
 
+  const sentiment = allowedSentiments.includes(data?.sentiment)
+    ? data.sentiment
+    : priority === 'Urgent' || priority === 'High'
+    ? 'Frustrated'
+    : 'Neutral';
+
+  const churnRisk = allowedChurnRisks.includes(data?.churnRisk)
+    ? data.churnRisk
+    : priority === 'Urgent'
+    ? 'High'
+    : priority === 'High'
+    ? 'Medium'
+    : 'Low';
+
+  const defaultSla = {
+    Urgent: '< 15 mins (P1 Critical)',
+    High: '< 1 hour (P2 Urgent)',
+    Medium: '< 4 hours (P3 Standard)',
+    Low: '< 24 hours (P4 General)',
+  };
+
+  const slaTarget =
+    typeof data?.slaTarget === 'string' && data.slaTarget.trim()
+      ? data.slaTarget.trim()
+      : defaultSla[priority] || '< 4 hours (P3 Standard)';
+
+  const defaultRoutes = {
+    Technical: priority === 'Urgent' ? 'Tier 3 DevOps / SRE' : 'Tier 2 Engineering Support',
+    Billing: 'Billing & Finance Operations',
+    Account: 'Identity & Access Management',
+    General: 'Tier 1 Customer Success',
+  };
+
+  const recommendedRoute =
+    typeof data?.recommendedRoute === 'string' && data.recommendedRoute.trim()
+      ? data.recommendedRoute.trim()
+      : defaultRoutes[category] || 'Tier 1 Customer Success';
+
+  const extractedEntities = Array.isArray(data?.extractedEntities)
+    ? data.extractedEntities
+        .filter(
+          (e) =>
+            e &&
+            typeof e.label === 'string' &&
+            typeof e.value === 'string' &&
+            e.value.trim()
+        )
+        .map((e) => ({ label: e.label.trim(), value: e.value.trim() }))
+    : [];
+
   const suggestedResponse =
     typeof data?.suggestedResponse === 'string' && data.suggestedResponse.trim()
       ? data.suggestedResponse.trim()
@@ -48,6 +100,11 @@ function sanitizeAnalysisResult(data) {
     category,
     priority,
     priorityReason,
+    sentiment,
+    churnRisk,
+    slaTarget,
+    recommendedRoute,
+    extractedEntities,
     suggestedResponse,
   };
 }
@@ -77,7 +134,7 @@ async function callGroqCompletion(groq, model, systemPrompt, userPrompt) {
  * Analyzes a customer support ticket using Groq API.
  * @param {string} subject - Subject line of the ticket
  * @param {string} description - Detailed description of the issue
- * @returns {Promise<{category: string, priority: string, priorityReason: string, suggestedResponse: string}>}
+ * @returns {Promise<{category: string, priority: string, priorityReason: string, sentiment: string, churnRisk: string, slaTarget: string, recommendedRoute: string, extractedEntities: Array<{label: string, value: string}>, suggestedResponse: string}>}
  */
 async function analyzeTicket(subject, description) {
   const apiKey = process.env.GROQ_API_KEY;
@@ -94,7 +151,7 @@ async function analyzeTicket(subject, description) {
   const groq = new Groq({ apiKey: apiKey.trim() });
   let model = process.env.GROQ_MODEL || DEFAULT_MODEL;
 
-  const systemPrompt = `You are an expert AI customer support triage assistant.
+  const systemPrompt = `You are an expert AI customer support triage assistant and operations intelligence agent.
 Analyze the incoming support ticket and output STRICT, VALID JSON ONLY.
 
 JSON Schema:
@@ -102,6 +159,13 @@ JSON Schema:
   "category": "Billing" | "Technical" | "Account" | "General",
   "priority": "Low" | "Medium" | "High" | "Urgent",
   "priorityReason": "A single concise sentence explaining why this priority level was assigned.",
+  "sentiment": "Frustrated" | "Neutral" | "Positive",
+  "churnRisk": "Low" | "Medium" | "High",
+  "slaTarget": "< 15 mins (P1 Critical)" | "< 1 hour (P2 Urgent)" | "< 4 hours (P3 Standard)" | "< 24 hours (P4 General)",
+  "recommendedRoute": "Tier 3 DevOps / SRE" | "Tier 2 Engineering Support" | "Billing & Finance Operations" | "Identity & Access Management" | "Tier 1 Customer Success",
+  "extractedEntities": [
+    { "label": "Error Code" | "Invoice ID" | "User / Email" | "Component" | "Affected URL", "value": "extracted value" }
+  ],
   "suggestedResponse": "A short, polite, and helpful draft reply addressing the user's issue directly with next steps."
 }
 
@@ -113,8 +177,13 @@ Rules:
    - Medium: General bugs with workarounds, non-critical billing questions.
    - Low: Minor feature inquiries, general questions, feedback.
 3. "priorityReason" MUST be exactly 1 sentence.
-4. "suggestedResponse" MUST be professional, empathetic, concise, and ready to send to the customer.
-5. Do NOT include markdown code blocks, backticks, commentary, or text outside the JSON object.`;
+4. "sentiment" MUST be: "Frustrated" (if angry, blocked, or complaining), "Neutral" (objective/factual), or "Positive" (friendly/complimentary).
+5. "churnRisk" MUST be: "High" (payment failures, revenue outage, rage/cancellation risk), "Medium", or "Low".
+6. "slaTarget": assign appropriate SLA (< 15 mins for Urgent, < 1 hr for High, < 4 hrs for Medium, < 24 hrs for Low).
+7. "recommendedRoute": the most appropriate engineering, billing, or security team queue.
+8. "extractedEntities": extract all relevant diagnostic entities (e.g. error codes like 500/403, invoice numbers, emails, URLs, affected modules). If none, return empty array [].
+9. "suggestedResponse" MUST be professional, empathetic, concise, and ready to send to the customer.
+10. Do NOT include markdown code blocks, backticks, commentary, or text outside the JSON object.`;
 
   const userPrompt = `Ticket Subject: ${subject || 'No subject provided'}
 Ticket Description: ${description || 'No description provided'}`;
@@ -127,7 +196,9 @@ Ticket Description: ${description || 'No description provided'}`;
     } catch (primaryErr) {
       // Automatic fallback if model is decommissioned or not found (404)
       if (
-        (primaryErr.status === 404 || primaryErr.code === 'model_not_found' || primaryErr.code === 'model_decommissioned') &&
+        (primaryErr.status === 404 ||
+          primaryErr.code === 'model_not_found' ||
+          primaryErr.code === 'model_decommissioned') &&
         model !== DEFAULT_MODEL
       ) {
         console.warn(
