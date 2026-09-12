@@ -63,14 +63,18 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start Express Server
-app.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(` Customer Support Ticket Assistant — Backend API`);
-  console.log(` Server running on: http://localhost:${PORT}`);
-  console.log(` Health check:      http://localhost:${PORT}/api/health`);
-  console.log(` Ticket Analysis:   POST http://localhost:${PORT}/api/tickets/analyze`);
-  console.log(` Groq API Key set:  ${Boolean(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here')}`);
-  console.log(` Active AI Model:   ${process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'}`);
-  console.log(`====================================================`);
-});
+// Start Express Server (only when not in Vercel serverless environment)
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(` Customer Support Ticket Assistant — Backend API`);
+    console.log(` Server running on: http://localhost:${PORT}`);
+    console.log(` Health check:      http://localhost:${PORT}/api/health`);
+    console.log(` Ticket Analysis:   POST http://localhost:${PORT}/api/tickets/analyze`);
+    console.log(` Groq API Key set:  ${Boolean(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here')}`);
+    console.log(` Active AI Model:   ${process.env.GROQ_MODEL || 'openai/gpt-oss-120b'}`);
+    console.log(`====================================================`);
+  });
+}
+
+module.exports = app;
