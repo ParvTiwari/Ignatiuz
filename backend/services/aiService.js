@@ -1,0 +1,158 @@
+const Groq = require('groq-sdk');
+
+const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
+const FALLBACK_MODEL = 'llama-3.1-8b-instant';
+
+/**
+ * Strips markdown code fence blocks (```json ... ``` or ``` ... ```) if present.
+ * @param {string} rawString
+ * @returns {string}
+ */
+function cleanJsonOutput(rawString) {
+  if (!rawString || typeof rawString !== 'string') return '';
+  return rawString
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
+}
+
+/**
+ * Validates and normalizes the parsed ticket analysis object.
+ * @param {object} data
+ * @returns {{category: string, priority: string, priorityReason: string, suggestedResponse: string}}
+ */
+function sanitizeAnalysisResult(data) {
+  const allowedCategories = ['Billing', 'Technical', 'Account', 'General'];
+  const allowedPriorities = ['Low', 'Medium', 'High', 'Urgent'];
+
+  const category = allowedCategories.includes(data?.category)
+    ? data.category
+    : 'General';
+
+  const priority = allowedPriorities.includes(data?.priority)
+    ? data.priority
+    : 'Medium';
+
+  const priorityReason =
+    typeof data?.priorityReason === 'string' && data.priorityReason.trim()
+      ? data.priorityReason.trim()
+      : 'Standard triage assessment based on ticket content.';
+
+  const suggestedResponse =
+    typeof data?.suggestedResponse === 'string' && data.suggestedResponse.trim()
+      ? data.suggestedResponse.trim()
+      : 'Thank you for contacting support. We have received your inquiry and our team is actively reviewing it.';
+
+  return {
+    category,
+    priority,
+    priorityReason,
+    suggestedResponse,
+  };
+}
+
+/**
+ * Analyzes a customer support ticket using Groq API.
+ * @param {string} subject - Subject line of the ticket
+ * @param {string} description - Detailed description of the issue
+ * @returns {Promise<{category: string, priority: string, priorityReason: string, suggestedResponse: string}>}
+ */
+async function analyzeTicket(subject, description) {
+  const apiKey = process.env.GROQ_API_KEY;
+
+  if (!apiKey || apiKey.trim() === '' || apiKey === 'your_groq_api_key_here') {
+    const error = new Error(
+      'GROQ_API_KEY is missing or unconfigured. Please get a free API key from https://console.groq.com/keys and add it to backend/.env'
+    );
+    error.statusCode = 500;
+    error.code = 'GROQ_API_KEY_MISSING';
+    throw error;
+  }
+
+  const groq = new Groq({ apiKey: apiKey.trim() });
+  const model = process.env.GROQ_MODEL || DEFAULT_MODEL;
+
+  const systemPrompt = `You are an expert AI customer support triage assistant.
+Analyze the incoming support ticket and output STRICT, VALID JSON ONLY.
+
+JSON Schema:
+{
+  "category": "Billing" | "Technical" | "Account" | "General",
+  "priority": "Low" | "Medium" | "High" | "Urgent",
+  "priorityReason": "A single concise sentence explaining why this priority level was assigned.",
+  "suggestedResponse": "A short, polite, and helpful draft reply addressing the user's issue directly with next steps."
+}
+
+Rules:
+1. "category" MUST be exactly one of: "Billing", "Technical", "Account", "General".
+2. "priority" MUST be exactly one of: "Low", "Medium", "High", "Urgent".
+   - Urgent: Severe outage, security breach, total service blockage, or immediate financial loss.
+   - High: Major feature failure, payment failed, critical account lockout.
+   - Medium: General bugs with workarounds, non-critical billing questions.
+   - Low: Minor feature inquiries, general questions, feedback.
+3. "priorityReason" MUST be exactly 1 sentence.
+4. "suggestedResponse" MUST be professional, empathetic, concise, and ready to send to the customer.
+5. Do NOT include markdown code blocks, backticks, commentary, or text outside the JSON object.`;
+
+  const userPrompt = `Ticket Subject: ${subject || 'No subject provided'}
+Ticket Description: ${description || 'No description provided'}`;
+
+  try {
+    const chatCompletion = await groq.chat.completions.create({
+      model: model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.2,
+      max_tokens: 512,
+    });
+
+    const rawContent = chatCompletion.choices?.[0]?.message?.content || '{}';
+    const cleanedContent = cleanJsonOutput(rawContent);
+
+    let parsedData;
+    try {
+      parsedData = JSON.parse(cleanedContent);
+    } catch (parseErr) {
+      // Safe fallback: attempt to extract json substring if markdown fences or preamble were included
+      const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsedData = JSON.parse(jsonMatch[0]);
+      } else {
+        const error = new Error('Failed to parse AI response into JSON: ' + parseErr.message);
+        error.statusCode = 502;
+        throw error;
+      }
+    }
+
+    return sanitizeAnalysisResult(parsedData);
+  } catch (err) {
+    if (err.status === 429 || (err.message && err.message.includes('429'))) {
+      const rateLimitError = new Error(
+        `Groq API rate limit reached (429). The model "${model}" exceeded its free-tier rate limit. Fallback recommendation: switch to model "${FALLBACK_MODEL}" in backend/.env or wait a few moments before retrying.`
+      );
+      rateLimitError.statusCode = 429;
+      rateLimitError.code = 'RATE_LIMIT_EXCEEDED';
+      throw rateLimitError;
+    }
+
+    if (err.status === 401 || (err.message && err.message.includes('401'))) {
+      const authError = new Error(
+        'Invalid Groq API Key (401 Unauthorized). Please check your GROQ_API_KEY in backend/.env'
+      );
+      authError.statusCode = 401;
+      authError.code = 'UNAUTHORIZED';
+      throw authError;
+    }
+
+    throw err;
+  }
+}
+
+module.exports = {
+  analyzeTicket,
+  DEFAULT_MODEL,
+  FALLBACK_MODEL,
+};
