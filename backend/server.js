@@ -18,8 +18,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Health check endpoint (matches both /api/health and /health for Vercel serverless routing)
+app.get(['/api/health', '/health', '/api', '/'], (req, res) => {
   res.status(200).json({
     status: 'ok',
     service: 'Customer Support Ticket Assistant API',
@@ -28,8 +28,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Mount Ticket API Routes
-app.use('/api/tickets', ticketsRouter);
+// Mount Ticket API Routes (matches both /api/tickets and /tickets)
+app.use(['/api/tickets', '/tickets'], ticketsRouter);
 
 // 404 Route Handler
 app.use((req, res) => {
